@@ -1,0 +1,103 @@
+---
+title: "PubMed Weekly Report"
+author: "Sophia Cofone"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, echo=FALSE}
+library(knitr)
+```
+
+```{r, echo=FALSE, message=FALSE}
+# 1. Library
+require(RMySQL)
+library(sqldf)
+
+# 2. Settings
+# db_user <- 'root'
+# db_password <- 'password'
+# db_host <- 'localhost'
+# db_port <- 3306
+
+### starSchemaAuthor ###
+# 3. Initial connection
+dbcon_mysqlA <-  dbConnect(MySQL(), user = db_user, password = db_password,
+                   host = db_host, port = db_port, local_infile=TRUE)
+
+invisible({dbSendQuery(dbcon_mysqlA, "set global local_infile=true;")})
+
+# 5. Update Settings/connection
+db_name <- 'starSchemaAuthor'
+
+# update connection
+dbcon_mysqlA <-  dbConnect(MySQL(), user = db_user, password = db_password,
+                 dbname = db_name, host = db_host, port = db_port, local_infile=TRUE)
+
+# 3. Initial connection
+dbcon_mysqlJ <-  dbConnect(MySQL(), user = db_user, password = db_password,
+                   host = db_host, port = db_port, local_infile=TRUE)
+
+invisible({dbSendQuery(dbcon_mysqlJ, "set global local_infile=true;")})
+
+# 5. Update Settings/connection
+db_name <- 'starSchemaJournal'
+
+# update connection
+dbcon_mysqlJ <-  dbConnect(MySQL(), user = db_user, password = db_password,
+                 dbname = db_name, host = db_host, port = db_port, local_infile=TRUE)
+```
+
+# This report is to provide an update on the top authors and publications in the PubMed data.
+
+## Summary table of top ten authors with the most publications
+```{r, echo=FALSE, message=FALSE}
+mysql_query <- "SELECT last_name, fore_name, articles_author, initials FROM AuthorFact 
+ORDER BY articles_author DESC 
+LIMIT 10"
+
+top_10_a = dbGetQuery(dbcon_mysqlA, mysql_query)
+
+top_10_a_noi <- subset(top_10_a, select = -ncol(top_10_a))
+
+kable(top_10_a_noi, align = c("l", "l","l"), col.names = c("Last Name", "Fore Name", "Number of Articles"))
+```
+```{r, echo=FALSE, message=FALSE}
+
+library(ggplot2)
+
+# create chart
+  authorplot <- ggplot(top_10_a, aes(x=reorder(initials, -articles_author), y=articles_author, fill=articles_author)) +
+  geom_col() +
+  scale_fill_gradient(low="blue", high="red") + 
+  ggtitle("Number of Publications by Author") +
+  xlab("Author") +
+  ylab("Top Authors by Publications") +
+  theme_light() +
+  geom_text(aes(label=articles_author), vjust=2, color="white", size=4)
+
+authorplot
+
+```
+The top 10 Authors currently are Costa, Thomas, Beckett, Storb, Snyder, Lefkowitz, Mandel, Weiden, Meister, and Janssen. Costa, Thomas, Beckett, and Storb all have over **30** publications, while Snyder, Lefkowitz, Mandel, Weiden, Meister, and Janssen have over **21** publications. 
+
+## Summary table of top journal with the most articles per year
+```{r, echo=FALSE, message=FALSE}
+mysql_query <- "SELECT journal_title, SUM(num_a_year) 
+FROM JournalFact 
+GROUP BY journal_title 
+ORDER BY SUM(num_a_year) DESC 
+LIMIT 1"
+
+top_journal = suppressWarnings(dbGetQuery(dbcon_mysqlJ, mysql_query))
+
+kable(top_journal, align = c("l", "l"), col.names = c("Journal Title", "Average Articles per Year"))
+```
+The top journal is the **Biochimica et biophysica acta** with **920** articles per year on average. 
+
+```{r, echo=FALSE, message=FALSE}
+invisible({dbDisconnect(dbcon_mysqlJ)})
+invisible({dbDisconnect(dbcon_mysqlA)})
+```
+
